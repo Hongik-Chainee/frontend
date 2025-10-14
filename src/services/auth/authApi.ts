@@ -1,4 +1,4 @@
-import { saveTokens } from "./tokenStorage";
+import { saveTokens, getAccessTokenRaw, isAccessExpired, clearTokens } from "./tokenStorage";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE!;
 
@@ -8,21 +8,44 @@ export async function refreshOnce(): Promise<boolean> {
     credentials: "include",
   });
   if (!res.ok) return false;
-  const data = await res.json(); // { accessToken, accessExp, ... }
+  const data = await res.json().catch(() => null); // { accessToken, accessExp, ... }
   if (!data?.accessToken || !data?.accessExp) return false;
   saveTokens(data.accessToken, Number(data.accessExp));
   return true;
 }
 
+/**
+ * 항상 유효한 액세스 토큰을 반환 (만료 시 refresh 시도)
+ * 실패 시 null
+ */
+export async function getValidAccessToken(): Promise<string | null> {
+  const raw = getAccessTokenRaw();
+  if (!raw) return null;
+
+  if (!isAccessExpired(10)) { // 10초 그레이스
+    return raw;
+  }
+
+  // 만료 → refresh 시도
+  const ok = await refreshOnce();
+  if (!ok) {
+    clearTokens();
+    return null;
+  }
+  return getAccessTokenRaw();
+}
+
 export async function fetchMe(): Promise<{ kyc: boolean; did: boolean } | null> {
-  const token = localStorage.getItem("accessToken");
+  const token = await getValidAccessToken();
   if (!token) return null;
+
   const res = await fetch(`${BASE}/api/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
     credentials: "include",
   });
   if (!res.ok) return null;
-  const data = await res.json(); // kyc/did 또는 status.kyc/status.did 형태 가정
+
+  const data = await res.json().catch(() => ({}));
   const kyc = data?.kyc ?? data?.status?.kyc ?? false;
   const did = data?.did ?? data?.status?.did ?? false;
   return { kyc, did };
