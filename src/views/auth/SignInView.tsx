@@ -1,15 +1,56 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AuthViewModel } from '@/viewModels/authViewModel';
+import { AuthViewModel, type NextStep } from '@/viewModels/authViewModel';
 
 export function SignInView() {
   const vm = useMemo(() => new AuthViewModel(), []);
   const router = useRouter();
 
+  // nextStep === null  -> 미인증 (배너/버튼 숨김)
+  // nextStep in KYC/DID/HOME -> 인증됨 (배너/버튼 노출)
+  const [nextStep, setNextStep] = useState<NextStep | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
+  // 페이지 진입 또는 OAuth 리다이렉트 복귀 시 인증 상태 판정
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setChecking(true);
+        setErrMsg(null);
+        const step = await vm.detectAuthAndNextStep(); // null이면 미인증
+        if (!mounted) return;
+        setNextStep(step); // null | 'KYC' | 'DID' | 'HOME'
+      } catch (e: any) {
+        if (!mounted) return;
+        setErrMsg(e?.message ?? '인증 상태 확인에 실패했습니다.');
+        setNextStep(null);
+      } finally {
+        if (mounted) setChecking(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [vm]);
+
+  const handleGoogle = () => {
+    // OAuth로 이동 (성공 시 returnTo로 복귀 -> 위 useEffect가 다시 판정)
+    vm.signInWithGoogle();
+  };
+
   const goNext = () => {
-    router.push('/onboarding/personal'); // ✅ 개인정보 입력 페이지로 이동
+    // NextStep에 따라 다음 페이지 분기
+    const routeMap: Record<NextStep, string> = {
+      KYC: '/onboarding/personal', // 개인정보 입력
+      DID: '/onboarding/did',      // DID 설정(필요 시 바꿔도 됨)
+      HOME: '/',                   // 홈/대시보드 등
+    };
+    const target = nextStep ? routeMap[nextStep] : '/';
+    router.push(target);
   };
 
   return (
@@ -30,7 +71,7 @@ export function SignInView() {
 
             <button
               type="button"
-              onClick={() => vm.signInWithGoogle()}
+              onClick={handleGoogle}
               className="mt-3 w-full rounded-lg bg-white text-black px-4 py-3 shadow-lg flex items-center justify-center gap-3 hover:bg-white/95 transition"
             >
               <svg className="h-5 w-5" aria-hidden="true" viewBox="0 0 24 24">
@@ -42,19 +83,29 @@ export function SignInView() {
               <span className="text-sm md:text-base font-medium">구글 로그인</span>
             </button>
 
-            {/* ✅ 인증 여부와 무관하게 항상 표시 */}
-            <div className="mt-6">
-              <div className="w-full text-center text-sm md:text-base font-semibold bg-white/10 rounded-lg py-3">
-                인증이 완료되었습니다.
+            {/* 에러가 있으면 표시 */}
+            {errMsg && (
+              <div className="mt-3 text-sm text-red-300">
+                {errMsg}
               </div>
-              <button
-                type="button"
-                onClick={goNext}
-                className="mt-3 w-full rounded-lg bg-primary px-4 py-3 font-medium hover:opacity-90 transition"
-              >
-                다음 단계로 넘어가기 →
-              </button>
-            </div>
+            )}
+
+            {/* ✅ 로그인 성공(nextStep 확정)일 때만 배너/버튼 노출 */}
+            {nextStep && (
+              <div className="mt-6">
+                <div className="w-full text-center text-sm md:text-base font-semibold bg-white/10 rounded-lg py-3">
+                  인증이 완료되었습니다.
+                  {checking && ' (확인 중)'}
+                </div>
+                <button
+                  type="button"
+                  onClick={goNext}
+                  className="mt-3 w-full rounded-lg bg-primary px-4 py-3 font-medium hover:opacity-90 transition"
+                >
+                  다음 단계로 넘어가기 →
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </main>
