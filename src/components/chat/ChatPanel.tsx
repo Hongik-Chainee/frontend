@@ -9,13 +9,12 @@ import { useChatPanel } from '@/providers/ChatPanelProvider';
 type ChatItem = {
     id: string;
     name: string;
-    avatar: string;
+    avatar?: string;
     preview: string;
-    time: string;        // "31 min ago" 같은 표시
-    unread?: number;     // 오른쪽 초록 동그라미 숫자
+    time: string;
+    unread?: number;
 };
 
-// 데모 데이터 (원하면 API 연동으로 교체)
 const demo: ChatItem[] = [
     { id: '1', name: 'Timothy Smith', avatar: '/avatar-timothy.png', preview: "Hello! My name is Timothy.\nI'd like to have a conversation about your resume.", time: '31 min ago', unread: 2 },
     { id: '2', name: 'Timothy Smith', avatar: '/avatar-timothy.png', preview: "Hello! My name is Timothy.\nI'd like to have a conversation about your resume.", time: '2 hour ago' },
@@ -25,12 +24,32 @@ const demo: ChatItem[] = [
 ];
 
 export default function ChatPanel() {
-    const { isOpen, close } = useChatPanel();
+    const { isOpen, close, openRoom } = useChatPanel();
+
+    const enterRoom = (id: string) => {
+        openRoom(id); // ✅ 플로팅 채팅창 열기
+    };
+
+    const Avatar = ({ name, src }: { name: string; src?: string }) => {
+        if (!src) {
+            const init = (name.split(' ')[0]?.[0] ?? 'U') + (name.split(' ')[1]?.[0] ?? '');
+            return (
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-white/10 ring-1 ring-white/20 text-xs font-semibold">
+                    {init.toUpperCase()}
+                </div>
+            );
+        }
+        return (
+            <div className="relative h-10 w-10 overflow-hidden rounded-full ring-1 ring-white/20 shrink-0">
+                {/* 이미지가 없으면 next/image가 에러를 던지니 public에 파일이 없을 경우 위 폴백으로 바꾸세요 */}
+                <Image src={src} alt={name} fill sizes="40px" />
+            </div>
+        );
+    };
 
     return (
         <Transition.Root show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-[100]" onClose={close}>
-                {/* 배경 */}
                 <Transition.Child
                     as={Fragment}
                     enter="ease-out duration-200" enterFrom="opacity-0" enterTo="opacity-100"
@@ -39,7 +58,6 @@ export default function ChatPanel() {
                     <div className="fixed inset-0 bg-black/40" />
                 </Transition.Child>
 
-                {/* 패널 */}
                 <div className="fixed inset-0 overflow-hidden">
                     <div className="absolute inset-0 flex justify-end">
                         <Transition.Child
@@ -50,7 +68,6 @@ export default function ChatPanel() {
                             leaveFrom="translate-x-0" leaveTo="translate-x-full"
                         >
                             <Dialog.Panel className="pointer-events-auto w-full max-w-sm">
-                                {/* 상단 타이틀 영역 (이미지 스타일 참고) */}
                                 <div className="h-full flex flex-col">
                                     <div className="relative flex items-center justify-between px-4 py-3">
                                         <Dialog.Title className="sr-only">Chatting</Dialog.Title>
@@ -63,27 +80,18 @@ export default function ChatPanel() {
                                         </button>
                                     </div>
 
-                                    {/* 카드 전체를 그라디언트로 */}
                                     <div className="mx-4 mb-6 rounded-3xl bg-gradient-to-b from-[#6D66F3] to-[#1E1A6B] p-4 shadow-2xl">
                                         <div className="rounded-2xl bg-white/10 p-3">
-                                            <div className="flex items-center justify-between">
-                                                <h2 className="text-white/90 font-semibold">Chatting</h2>
-                                            </div>
+                                            <h2 className="text-white/90 font-semibold">Chatting</h2>
 
                                             <ul className="mt-2 max-h-[70vh] overflow-y-auto pr-1">
                                                 {demo.map((c) => (
                                                     <li key={c.id}>
                                                         <button
+                                                            onClick={() => enterRoom(c.id)}
                                                             className="w-full text-left rounded-2xl px-3 py-3 hover:bg-white/10 transition flex items-center gap-3"
-                                                            // onClick={() => ... 상세 채팅으로 이동}
                                                         >
-                                                            {/* 아바타 */}
-                                                            <div className="relative h-10 w-10 overflow-hidden rounded-full ring-1 ring-white/20 shrink-0">
-                                                                {/* 프로젝트에 실제 이미지가 없으면 /public/avatar-timothy.png를 만들어 두세요 */}
-                                                                <Image src={c.avatar} alt={c.name} fill sizes="40px" />
-                                                            </div>
-
-                                                            {/* 텍스트 */}
+                                                            <Avatar name={c.name} src={c.avatar} />
                                                             <div className="min-w-0 flex-1">
                                                                 <div className="flex items-center justify-between">
                                                                     <p className="truncate text-sm font-semibold text-white">{c.name}</p>
@@ -93,8 +101,6 @@ export default function ChatPanel() {
                                                                     {c.preview}
                                                                 </p>
                                                             </div>
-
-                                                            {/* 우측 초록 점/숫자 */}
                                                             {typeof c.unread === 'number' ? (
                                                                 <span className="ml-2 grid h-6 w-6 place-items-center rounded-full bg-[#71FF9C] text-[11px] font-bold text-black">
                                   {c.unread}
@@ -107,14 +113,12 @@ export default function ChatPanel() {
                                         </div>
                                     </div>
 
-                                    {/* 하단 여백 */}
                                     <div className="pb-6" />
                                 </div>
                             </Dialog.Panel>
                         </Transition.Child>
                     </div>
                 </div>
-
             </Dialog>
         </Transition.Root>
     );
