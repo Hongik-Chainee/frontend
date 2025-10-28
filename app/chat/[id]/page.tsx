@@ -1,101 +1,97 @@
+// src/app/chat/[id]/page.tsx
 'use client';
 
-import Image from 'next/image';
-import { useState } from 'react';
-import { ArrowLeftIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { useRouter } from 'next/navigation';
-
-type Message = {
-    id: number;
-    sender: 'me' | 'other';
-    text: string;
-};
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { ChatWsClient } from '@/services/chat/chatWs';
+import { fetchMessages, markRead, sendMessage, ChatMessage } from '@/services/chat/chatApi';
 
 export default function ChatRoomPage() {
-    const router = useRouter();
+    const { id } = useParams<{ id: string }>();
+    const conversationId = Number(id);
 
-    const [messages, setMessages] = useState<Message[]>([
-        { id: 1, sender: 'other', text: "Hello! My name is Timothy.\nI’d like to have a conversation about your resume." },
-        { id: 2, sender: 'me', text: "Nice to meet you.\nWhich part of the resume you want to talk about?" },
-        { id: 3, sender: 'other', text: "I found that you are interested of desktop developing." },
-        { id: 4, sender: 'other', text: "I thought your skills are great,\nbut we are looking for someone who has mobile experience." },
-        { id: 5, sender: 'me', text: "Oh, But I have experience of making mobile app service too.\nI haven’t uploaded it yet.\nI’ll send you about it so could you check it later please?" },
-        { id: 6, sender: 'other', text: "I’ll send you it tonight." },
-    ]);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [text, setText] = useState('');
+    const bottomRef = useRef<HTMLDivElement | null>(null);
 
-    const [input, setInput] = useState('');
+    // 하나만 재사용
+    const ws = useMemo(() => new ChatWsClient(), []);
 
-    const handleSend = () => {
-        if (!input.trim()) return;
-        setMessages([...messages, { id: Date.now(), sender: 'me', text: input }]);
-        setInput('');
+    useEffect(() => {
+        // 1) 초기 메시지 로드 + 읽음 처리
+        (async () => {
+            const page0 = await fetchMessages(conversationId, 0, 50);
+            setMessages(page0.content || []);
+            await markRead(conversationId);
+        })();
+    }, [conversationId]);
+
+    useEffect(() => {
+        // 2) WS 구독
+        let unsub: any;
+        (async () => {
+            const sub = await ws.subscribeConversation(conversationId, (incoming) => {
+                setMessages((prev) => [...prev, incoming]);
+            });
+            unsub = () => sub.unsubscribe();
+        })();
+
+        return () => {
+            unsub?.();
+            ws.deactivate();
+        };
+    }, [conversationId, ws]);
+
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages.length]);
+
+    const onSend = async () => {
+        const body = text.trim();
+        if (!body) return;
+        await ws.send(conversationId, body);
+        // 낙관적 업데이트가 필요하면 여기서 바로 push 가능 (지금은 서버 echo로만 추가)
+        setText('');
     };
 
     return (
-        <div className="flex h-[100vh] flex-col bg-gradient-to-b from-[#6D66F3] to-[#1E1A6B] text-white">
-            {/* 상단 헤더 */}
-            <header className="flex items-center justify-between p-4 border-b border-white/10">
-                <div className="flex items-center gap-2">
-                    <button className="p-1 rounded-full hover:bg-white/10" onClick={() => router.back()}>
-                        <ArrowLeftIcon className="h-5 w-5" />
-                    </button>
-                    <div className="flex items-center gap-3">
-                        <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/20">
-                            <Image src="/avatar-timothy.png" alt="Timothy" fill sizes="40px" />
-                        </div>
-                        <div>
-                            <p className="font-semibold text-sm">Timothy Smith</p>
-                            <p className="text-xs text-[#71FF9C]">From DID Mobile App Frontend Developer</p>
-                        </div>
-                    </div>
-                </div>
-                <button className="p-1 rounded-full hover:bg-white/10" onClick={() => router.push('/')}>
-                    <XMarkIcon className="h-5 w-5" />
-                </button>
-            </header>
+        <div className="fixed right-4 bottom-4 z-[110] w-[380px] max-w-[92vw] rounded-2xl border border-white/10 bg-[#0f1120]/95 backdrop-blur shadow-2xl">
+            {/* 헤더 */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                <div className="text-sm font-semibold text-white">대화방 #{conversationId}</div>
+            </div>
 
-            {/* 본문 채팅 영역 */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-                {messages.map((msg) => (
-                    <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                        <div
-                            className={`max-w-[75%] whitespace-pre-wrap px-4 py-2 rounded-2xl text-sm leading-relaxed ${
-                                msg.sender === 'me'
-                                    ? 'bg-[#7F7DFF] text-white rounded-br-none'
-                                    : 'bg-white/10 text-white rounded-bl-none'
-                            }`}
-                        >
-                            {msg.text}
+            {/* 메시지 리스트 */}
+            <div className="h-[420px] overflow-y-auto p-3 space-y-2">
+                {messages.map((m) => (
+                    <div key={m.id} className="flex">
+                        {/* 단순하게 전부 우측 정렬 (필요시 m.sender.id 비교해 좌/우 나누기) */}
+                        <div className="ml-auto max-w-[80%] rounded-xl bg-white/10 px-3 py-2 text-sm text-white">
+                            {m.content}
+                            <div className="mt-1 text-[10px] opacity-60">
+                                {new Date(m.createdAt).toLocaleString()}
+                            </div>
                         </div>
                     </div>
                 ))}
+                <div ref={bottomRef} />
             </div>
 
-            {/* 하단 입력창 */}
-            <div className="border-t border-white/10 p-4">
-                <div className="flex items-center gap-2">
-                    <button className="px-3 py-2 text-xs font-semibold rounded-xl bg-[#B894F9]/30 text-white border border-[#B894F9]/40 hover:bg-[#B894F9]/40 transition">
-                        File
-                    </button>
-                    <button className="px-3 py-2 text-xs font-semibold rounded-xl bg-[#71FF9C]/90 text-black hover:bg-[#71FF9C] transition">
-                        Make a contract
-                    </button>
-                    <div className="flex-1 flex items-center bg-white/10 rounded-2xl px-3">
-                        <input
-                            className="flex-1 bg-transparent text-sm text-white placeholder-white/60 outline-none py-2"
-                            placeholder="Type a message..."
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        />
-                        <button
-                            onClick={handleSend}
-                            className="ml-2 px-3 py-1 text-xs font-bold bg-[#71FF9C]/90 text-black rounded-xl hover:bg-[#71FF9C]"
-                        >
-                            SEND
-                        </button>
-                    </div>
-                </div>
+            {/* 입력영역 */}
+            <div className="flex items-center gap-2 p-3 border-t border-white/10">
+                <input
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onKeyDown={(e) => (e.key === 'Enter' ? onSend() : undefined)}
+                    placeholder="메시지를 입력하세요…"
+                    className="flex-1 rounded-xl bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40"
+                />
+                <button
+                    onClick={onSend}
+                    className="rounded-lg bg-[#71FF9C] px-3 py-2 text-sm font-semibold text-black hover:opacity-90"
+                >
+                    전송
+                </button>
             </div>
         </div>
     );
