@@ -8,9 +8,11 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 import { useChatPanel } from '@/providers/ChatPanelProvider';
-import { fetchConversations, ConversationSummary } from '@/services/chat/chatApi';
+
 import { getValidAccessToken, refreshOnce } from '@/services/auth/authApi';
 import { clearTokens } from '@/services/auth/tokenStorage';
+import {ConversationSummary} from "@/models/chat";
+import {fetchConversations} from "@/services/chat/chatApi";
 
 // 날짜 포맷(“31분 전”, “어제”, “yyyy-MM-dd” 간단 버전)
 function formatRelative(iso?: string | null) {
