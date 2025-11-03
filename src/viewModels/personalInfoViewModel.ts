@@ -1,22 +1,22 @@
+// src/viewmodels/PersonalInfoViewModel.ts
 import { kycPhoneRequest, kycPhoneVerify } from "@/services/kyc/kycApi";
+
 export type TelCarrier = 'SKT' | 'KT' | 'LGU+' | '';
 
 export class PersonalInfoViewModel {
   // 약관
   agreeAll = false;
   agreeRequired = {
-    privacy: false,   // [필수] 개인정보 수집/이용
-    idService: false, // [필수] 본인확인 서비스 이용약관
-    thirdParty: false,// [필수] 고유식별정보 처리
-    telTerms: false,  // [필수] 통신사 이용약관
+    privacy: false,
+    idService: false,
+    thirdParty: false,
+    telTerms: false,
   };
 
   setAgreeAll(v: boolean) {
     this.agreeAll = v;
-    Object.keys(this.agreeRequired).forEach(k => {
-      // @ts-ignore
-      this.agreeRequired[k] = v;
-    });
+    (Object.keys(this.agreeRequired) as (keyof typeof this.agreeRequired)[])
+      .forEach(k => { this.agreeRequired[k] = v; });
   }
   setAgree(key: keyof typeof this.agreeRequired, v: boolean) {
     this.agreeRequired[key] = v;
@@ -26,32 +26,40 @@ export class PersonalInfoViewModel {
     return Object.values(this.agreeRequired).every(Boolean);
   }
 
-  // 휴대폰 인증 (UI 상태만)
+  // 휴대폰 인증 (UI 상태)
   name = '';
-  rrnFront = '';   // 생년월일 6자리
-  rrnBack = '';    // 뒤 1자리 + **** (UI에선 1자리만 입력)
+  rrnFront = '';    // 생년월일 6자리
+  rrnBack  = '';    // 뒤 1자리(UI)
   carrier: TelCarrier = '';
   phone = '';
-  code = '';
-  requested = false; // 인증요청 눌렀는지
-  verified = false;  // 확인 완료 여부(지금은 더미)
+  code  = '';
 
+  requested = false;
+  verified  = false;
+
+  requestId: string | null = null;
+
+  /** 인증번호 요청 가능 여부 */
   canRequest() {
-    return this.name && this.rrnFront.length === 6 && this.rrnBack.length === 1
-      && this.carrier && /^\d{10,11}$/.test(this.phone);
+    return !!this.name.trim()
+      && this.rrnFront.length === 6
+      && this.rrnBack.length === 1
+      && !!this.carrier
+      && /^\d{10,11}$/.test(this.phone);
   }
-  canConfirm() {
-    return this.requested && this.code.length >= 4;
-  }
-  // 더미 동작
-  requestCode() { this.requested = true; }
-  confirmCode() { if (this.canConfirm()) this.verified = true; }
 
+  /** 인증번호 확인(검증) 가능 여부 */
+  canConfirm() {
+    return this.requested
+      && !!this.name.trim()
+      && /^\d{6}$/.test(this.code)
+      && !!this.requestId;
+  }
+
+  /** 다음 단계로 이동 가능 여부: 약관 모두 동의 + KYC 인증 완료 */
   get canGoNext() {
     return this.allRequiredAgreed && this.verified;
   }
-
-  requestId: string | null = null;
 
   async requestCodeReal(): Promise<boolean> {
     if (!this.canRequest()) return false;
@@ -62,9 +70,9 @@ export class PersonalInfoViewModel {
   }
 
   async confirmCodeReal(): Promise<boolean> {
-    if (!this.canConfirm() || !this.requestId) return false;
-    const r = await kycPhoneVerify(this.requestId, this.code);
-    this.verified = !!r.kycVerified;
+    if (!this.canConfirm()) return false;
+    const resp = await kycPhoneVerify(this.requestId!, this.code, this.name.trim());
+    this.verified = !!resp.kycVerified;
     return this.verified;
   }
 }

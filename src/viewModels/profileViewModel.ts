@@ -1,125 +1,103 @@
-// src/viewModels/profileViewModel.ts
-"use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { fetchProfile, ProfileApi } from "@/services/profile/profileApi";
-import { getAccessTokenRaw } from "@/services/auth/tokenStorage";
+import { useState, useEffect } from 'react';
+import { User, Project, JobPosting, Resume, Introduction } from '@/models/profile';
 
-// UI 모델들 (네가 올린 models/profile.ts 인터페이스에 맞춰 매핑)
-import type { User, Project, JobPosting, Resume, Introduction } from "@/models/profile";
+// Helper function to simulate API delay
+const fetchWithDelay = <T,>(data: T, delay = 500): Promise<T> =>
+  new Promise(resolve => setTimeout(() => resolve(data), delay));
 
-/** (검증 없이) JWT payload uid 추출 유틸 */
-function getUidFromAccess(access?: string | null): number | null {
-  if (!access) return null;
-  const parts = access.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const payload = JSON.parse(atob(parts[1]));
-    const uid: unknown = payload?.uid ?? payload?.sub;
-    if (typeof uid === "number") return uid;
-    if (typeof uid === "string") return Number(uid);
-    return null;
-  } catch {
-    return null;
-  }
+// --- Mock Data (Simulating a backend API response) ---
+const mockUser: User = {
+  name: 'Yoonseo Lee',
+  tags: ['Designer', 'Illustrator'],
+  university: 'from Hongik. Univ',
+  location: 'in Seoul, Republic of Korea',
+  website: 'www.yoonseolee.com',
+  followers: 298,
+  following: 305,
+  avatarUrl: '/avatar.png', // Placeholder image path
+};
+
+const mockProjects: Project[] = [
+  { name: "Project name 1", description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", imageUrl: '/project1.png' },
+  { name: "Project name 2", description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", imageUrl: '/project2.png' },
+  { name: "Project name 3", description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", imageUrl: '/project3.png' },
+];
+
+const mockJobPostings: JobPosting[] = [
+  { name: "Project name A", status: "OPEN", details: "<> Engineering | ~25/7/31 | 14 applications" },
+  { name: "Project name B", status: "OPEN", details: "<> Engineering | ~25/7/31 | 14 applications" },
+  { name: "Project name C", status: "Closed", details: "<> Engineering | ~25/7/31 | 14 applications" },
+];
+
+const mockResumes: Resume[] = [
+  { name: "Resume_2025ver", lastUpdate: "8/23/25" },
+  { name: "Resume_2024ver", lastUpdate: "8/23/25" },
+];
+
+const mockIntroduction: Introduction = {
+    title: "Hi! I'm a branding designer, just graduated.",
+    body: `Self promotion information Self promotion information Self promotion
+           information Self promotion information Self promotion information Self
+           promotion information Self promotion information Self promotion information
+           Self promotion information Self promotion information Self promotion
+           information Self promotion information Self promotion information Self
+           promotion information Self promotion information 최대 글자수는?`
 }
 
-function mapToUser(api: ProfileApi): User {
-  return {
-    name: api.name || "",
-    tags: api.positions ?? [],
-    university: api.from || "",
-    location: api.in || "",
-    website: (api.website || "").replace(/^https?:\/\//, ""),
-    followers: api.followerCount ?? 0,
-    following: api.followingCount ?? 0,
-    avatarUrl: api.profileImageUrl || "",
-  };
-}
-
-function mapToProjects(api: ProfileApi): Project[] {
-  return (api.myProjects ?? []).map(p => ({
-    name: p.title,
-    description: p.nftTokenUri || "", // 일단 설명 대체; 추후 별도 필드 매핑
-    imageUrl: "",                      // 필요 시 mainProject/cover 이미지 엔드포인트 붙이기
-  }));
-}
-
-function mapToJobPosts(api: ProfileApi): JobPosting[] {
-  return (api.jobPosts ?? []).map(j => ({
-    name: j.title,
-    status: new Date(j.deadline) >= new Date() ? "OPEN" : "Closed",
-    details: `${j.description} (지원자 ${j.applicantCount}명)`,
-  }));
-}
-
-function mapToResumes(api: ProfileApi): Resume[] {
-  return (api.resumes ?? []).map(r => ({
-    name: r.title,
-    lastUpdate: r.createdAt?.slice(0, 10) ?? "",
-  }));
-}
-
-function mapToIntroduction(api: ProfileApi): Introduction | null {
-  const hasAny = api.introductionHeadline || api.introductionContent;
-  if (!hasAny) return null;
-  return {
-    title: api.introductionHeadline || "",
-    body: api.introductionContent || "",
-  };
-}
-
-export function useProfileViewModel(userId: string) {
-  const [loading, setLoading] = useState(true);
-  const [api, setApi] = useState<ProfileApi | null>(null);
-  const [notFound, setNotFound] = useState(false);
+// --- ViewModel Hook ---
+export function useProfileViewModel() {
+  const [user, setUser] = useState<User | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [jobPostings, setJobPostings] = useState<JobPosting[]>([]);
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [introduction, setIntroduction] = useState<Introduction | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLoading(true);
+    const fetchProfileData = async () => {
       try {
-        const data = await fetchProfile(userId);
-        if (!alive) return;
-        if (!data) {
-          setNotFound(true);
-          setApi(null);
-        } else {
-          setApi(data);
-          setNotFound(false);
-        }
-      } catch (e) {
-        console.error(e);
-        if (alive) setNotFound(true);
+        setIsLoading(true);
+        // Simulate fetching all data in parallel
+        const [
+            user, 
+            projects, 
+            jobPostings, 
+            resumes,
+            introduction
+        ] = await Promise.all([
+          fetchWithDelay(mockUser),
+          fetchWithDelay(mockProjects),
+          fetchWithDelay(mockJobPostings),
+          fetchWithDelay(mockResumes),
+          fetchWithDelay(mockIntroduction)
+        ]);
+
+        setUser(user);
+        setProjects(projects);
+        setJobPostings(jobPostings);
+        setResumes(resumes);
+        setIntroduction(introduction);
+
+      } catch (error) {
+        console.error("Failed to fetch profile data:", error);
+        // Here you could set an error state
       } finally {
-        if (alive) setLoading(false);
+        setIsLoading(false);
       }
-    })();
-    return () => { alive = false; };
-  }, [userId]);
+    };
 
-  // 소유자 여부: accessToken의 uid === api.id
-  const isOwner = useMemo(() => {
-    const uid = getUidFromAccess(getAccessTokenRaw());
-    if (!uid || !api?.id) return false;
-    return Number(uid) === Number(api.id);
-  }, [api]);
-
-  // UI 모델 매핑
-  const user: User | null = useMemo(() => (api ? mapToUser(api) : null), [api]);
-  const projects: Project[] = useMemo(() => (api ? mapToProjects(api) : []), [api]);
-  const jobPostings: JobPosting[] = useMemo(() => (api ? mapToJobPosts(api) : []), [api]);
-  const resumes: Resume[] = useMemo(() => (api ? mapToResumes(api) : []), [api]);
-  const introduction: Introduction | null = useMemo(() => (api ? mapToIntroduction(api) : null), [api]);
+    fetchProfileData();
+  }, []);
 
   return {
-    isLoading: loading,
-    notFound,
-    isOwner,
     user,
     projects,
     jobPostings,
     resumes,
     introduction,
+    isLoading,
+    // In a real app, you'd have functions here to update data, e.g.:
+    // updateUser: (updatedUser) => { ... },
   };
 }
