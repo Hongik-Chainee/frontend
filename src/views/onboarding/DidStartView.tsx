@@ -21,14 +21,13 @@ export function DidStartView() {
   const btn = 'rounded-lg bg-primary px-4 py-3 font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition';
   const pill = 'inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-white/10';
 
+  // 1) 지갑 연결 + nonce 서명 검증 (이동 X)
   const connect = async () => {
     setMsg(null); setBusy(true);
     const r = await vm.connectAndVerify();
     setBusy(false);
     if (r.ok) {
       setMsg('지갑 인증이 완료되었습니다.');
-      // 다음 페이지로 이동 (예: 추가 정보 → 완료)
-      router.push('/onboarding/did/complete');
     } else {
       if (r.error === 'PHANTOM_NOT_FOUND') {
         setMsg('Phantom 지갑을 설치/활성화 해주세요.');
@@ -40,6 +39,27 @@ export function DidStartView() {
         setMsg('지갑 연결 중 오류가 발생했습니다.');
       }
     }
+  };
+
+  // 2) 온체인 DID 발급 → 3) 백엔드 마킹 → 4) 완료 페이지 이동
+  const issueDidOnChain = async () => {
+    setMsg(null); setBusy(true);
+    const r = await vm.issueDidInitOnChain();
+    if (!r.ok) {
+      setBusy(false);
+      setMsg(`발급 실패: ${r.error}`);
+      return;
+    }
+
+    const m = await vm.markDidVerified(); // { verified: true }
+    setBusy(false);
+
+    if (!m.ok) {
+      setMsg(`상태 반영 실패: ${m.error}`);
+      return;
+    }
+
+    router.push('/onboarding/did/complete');
   };
 
   return (
@@ -132,11 +152,8 @@ export function DidStartView() {
 
           {/* 하단 CTA */}
           <div className="text-center pt-2">
-            <button
-              className={btn}
-              onClick={() => router.push('/onboarding/did/complete')}
-            >
-              DID 발급 시작하기 →
+            <button className={btn} onClick={issueDidOnChain} disabled={busy}>
+              {busy ? "발급 중…" : "DID 발급 시작하기 →"}
             </button>
           </div>
         </main>

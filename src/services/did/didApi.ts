@@ -1,3 +1,4 @@
+// src/services/did/didApi.ts
 import { saveTokens } from "@/services/auth/tokenStorage";
 import { getValidAccessToken } from "@/services/auth/authApi";
 
@@ -35,10 +36,34 @@ export async function didVerify(did: string, addressBase58: string, signatureBas
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data?.messageCode || `VERIFY_FAIL ${r.status}`);
 
-  // 백엔드가 새 accessToken/exp 내려주면 저장
   if (data?.accessToken && data?.accessExp) {
     saveTokens(data.accessToken, Number(data.accessExp));
   }
 
   return data as { success: true; accessToken: string; accessExp: number; refreshExp: number };
+}
+
+// 최종 마킹: didVerified = true (idempotent)
+export async function didMarkVerified(verified: boolean) {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("NO_TOKEN");
+
+  const r = await fetch(`${BASE}/api/did/verify`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ verified }),
+  });
+
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data?.messageCode || `MARK_VERIFY_FAIL ${r.status}`);
+
+  if (data?.accessToken && data?.accessExp) {
+    saveTokens(data.accessToken, Number(data.accessExp));
+  }
+
+  return data as { success: true };
 }

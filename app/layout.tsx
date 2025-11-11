@@ -7,8 +7,10 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { SolanaProvider } from "@/providers/SolanaProvider";
 import { ChatPanelProvider } from "@/providers/ChatPanelProvider";
+import { NotificationPanelProvider } from "@/providers/NotificationPanelProvider";
 import ChatPanel from "@/components/chat/ChatPanel";
 import ChatWindow from "@/components/chat/ChatWindow"; // ✅ 추가
+import NotificationPanel from "@/components/layout/NotificationPanel";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -24,14 +26,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <body className="min-h-screen flex flex-col relative">
         <SolanaProvider>
             <ChatPanelProvider>
-                <Header />
-                <main className="flex-grow relative z-10">{children}</main>
+                <NotificationPanelProvider>
+                    <Header />
+                    <main className="flex-grow relative z-10">{children}</main>
 
-                {/* 전역: 사이드 리스트 + 플로팅 채팅창 */}
-                <ChatPanel />
-                <ChatWindow />
+                    {/* 전역: 사이드 리스트 + 플로팅 채팅창 */}
+                    <ChatPanel />
+                    <ChatWindow />
+                    <NotificationPanel />
 
-                <Footer />
+                    <Footer />
+                </NotificationPanelProvider>
             </ChatPanelProvider>
         </SolanaProvider>
         </body>

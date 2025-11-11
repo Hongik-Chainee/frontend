@@ -12,6 +12,7 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 
 // ✅ Chat panel
 import { useChatPanel } from '@/providers/ChatPanelProvider';
+import { useNotificationPanel } from '@/providers/NotificationPanelProvider';
 
 // ✅ Auth 토큰 읽기/삭제 유틸 (이미 있는 것 사용)
 import { getAccessTokenRaw, clearTokens } from '@/services/auth/tokenStorage';
@@ -71,6 +72,7 @@ export default function Header() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const { open: openChat } = useChatPanel();
+    const { open: openNotifications } = useNotificationPanel();
 
     // 👇 헤더에서 즉시 반영될 인증 상태
     const [isAuthed, setIsAuthed] = useState<boolean>(!!getAccessTokenRaw());
@@ -156,8 +158,12 @@ export default function Header() {
                                     <ChatBubbleLeftIcon className="h-6 w-6" />
                                 </button>
 
-                                {/* 알림 버튼 (보류) */}
-                                <button type="button" className="ml-2 p-1 text-gray-300 hover:text-white">
+                                {/* 알림 버튼 */}
+                                <button
+                                    type="button"
+                                    className="ml-2 p-1 text-gray-300 hover:text-white"
+                                    onClick={() => openNotifications()}
+                                >
                                     <span className="sr-only">알림 보기</span>
                                     <BellIcon className="h-6 w-6" aria-hidden="true" />
                                 </button>
