@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Talent, TalentListResponse } from "@/models/talent";
-import type { JobListResponse, JobPost } from "@/models/job";
+import type { JobListResponse, JobPost, JobSort } from "@/models/job";
 
 export type SortType = "RECENT" | "NAME" | "LOCATION" | "POPULAR";
 type FetchMode = "replace" | "append";
@@ -17,15 +17,6 @@ export interface SearchVMInit {
   sortJobs: JobSort;            // ✅ 타입 변경
   includeMainProject: boolean;
 }
-
-/** ✅ 잡 정렬 타입 (서버 명세) */
-export type JobSort =
-  | "RECENT"
-  | "DEADLINE_ASC"
-  | "DEADLINE_DESC"
-  | "PAYMENT_ASC"
-  | "PAYMENT_DESC"
-  | "APPLICANTS_DESC";
 
 // === 엔드포인트 =========================================
 const TALENT_SEARCH_ENDPOINT = "https://chainee.store/api/talents/search";

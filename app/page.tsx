@@ -45,7 +45,6 @@ export default function Home() {
               priority
             />
 
-            <div className="mt-4">
               <Link href="/auth/walletguide">
                 <motion.button
                   className="bg-web3-mint hover:bg-web3-mintDark text-black font-bold py-3 px-8 rounded-lg text-lg shadow-lg transition-all"
@@ -55,7 +54,6 @@ export default function Home() {
                   Wallet guide test
                 </motion.button>
               </Link>
-            </div>
           </div>
         </div>
       </section>

@@ -32,3 +32,11 @@ export interface JobListResponse {
   size: number;
   posts: JobPost[];
 }
+
+export type JobSort =
+  | "RECENT"
+  | "DEADLINE_ASC"
+  | "DEADLINE_DESC"
+  | "PAYMENT_ASC"
+  | "PAYMENT_DESC"
+  | "APPLICANTS_DESC";
