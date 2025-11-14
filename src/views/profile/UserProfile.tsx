@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useProfileViewModel } from '@/viewModels/profileViewModel';
 import { Introduction } from "./Introduction";
 import { MyProject } from "./MyProject";
@@ -8,19 +9,31 @@ import { Resume } from "./Resume";
 import { UserInfo } from "./UserInfo";
 
 export function UserProfile() {
-  const { 
-    user, 
-    projects, 
-    jobPostings, 
-    resumes, 
-    introduction, 
-    isLoading 
-  } = useProfileViewModel();
+  const searchParams = useSearchParams();
+  const userId = searchParams?.get('userId') ?? undefined;
+
+  const {
+    user,
+    projects,
+    jobPostings,
+    resumes,
+    introduction,
+    isLoading,
+    error,
+  } = useProfileViewModel({ userId });
 
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <p className="text-2xl">Loading profile...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p className="text-2xl text-red-400">{error}</p>
       </div>
     );
   }

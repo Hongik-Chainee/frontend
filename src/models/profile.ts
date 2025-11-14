@@ -1,5 +1,5 @@
-
 export interface User {
+  id?: number;
   name: string;
   tags: string[];
   university: string;
@@ -8,6 +8,7 @@ export interface User {
   followers: number;
   following: number;
   avatarUrl: string; // Added for the avatar image
+  isFollowing?: boolean;
 }
 
 export interface Project {
@@ -20,6 +21,7 @@ export interface JobPosting {
   name: string;
   status: 'OPEN' | 'Closed';
   details: string;
+  applicantCount?: number;
 }
 
 export interface Resume {
@@ -30,4 +32,55 @@ export interface Resume {
 export interface Introduction {
     title: string;
     body: string;
+}
+
+export interface ProfileResponse {
+  id: number;
+  email?: string;
+  name?: string;
+  profileImageUrl?: string;
+  positions?: string[];
+  from?: string;
+  in?: string;
+  website?: string;
+  introductionHeadline?: string;
+  introductionContent?: string;
+  introductionPhotoUrl?: string;
+  mainProject?: ApiProject;
+  myProjects?: ApiProject[];
+  jobPosts?: ApiJobPost[];
+  resumes?: ApiResume[];
+  followerCount?: number;
+  followingCount?: number;
+  isFollowing?: boolean;
+}
+
+export interface ApiProject {
+  id: number;
+  title?: string;
+  nftTokenUri?: string;
+  completedAt?: string;
+  description?: string;
+  isPublic?: boolean;
+  thumbnailUrl?: string;
+}
+
+export interface ApiJobPost {
+  id: number;
+  title?: string;
+  description?: string;
+  payment?: number;
+  requiredSkills?: string[] | string;
+  deadline?: string;
+  applicantCount?: number;
+  status?: string;
+  location?: string;
+}
+
+export interface ApiResume {
+  id?: number;
+  name?: string;
+  title?: string;
+  updatedAt?: string;
+  lastUpdate?: string;
 }
