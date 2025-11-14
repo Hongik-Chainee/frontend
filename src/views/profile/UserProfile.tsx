@@ -20,6 +20,7 @@ export function UserProfile() {
     introduction,
     isLoading,
     error,
+    refetch,
   } = useProfileViewModel({ userId });
 
   if (isLoading) {
@@ -42,7 +43,7 @@ export function UserProfile() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <main>
         <div className="mt-8">
-          <UserInfo user={user} />
+          <UserInfo user={user} onUpdated={refetch} />
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-16">
             <div className="lg:col-span-2">
