@@ -50,3 +50,31 @@ export async function fetchMe(): Promise<{ kyc: boolean; did: boolean } | null> 
   const did = data?.did ?? data?.status?.did ?? false;
   return { kyc, did };
 }
+
+type ExchangeResponse = {
+  accessToken: string;
+  accessExp: number;
+  nextStep?: "KYC" | "DID" | "HOME";
+};
+
+export async function exchangeLoginCode(loginCode: string): Promise<ExchangeResponse> {
+  const res = await fetch(`${BASE}/api/auth/exchange`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ loginCode }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`LOGIN_CODE_EXCHANGE_FAILED ${res.status} ${text}`);
+  }
+
+  const data = (await res.json()) as ExchangeResponse;
+  if (!data?.accessToken || !data?.accessExp) {
+    throw new Error("INVALID_EXCHANGE_RESPONSE");
+  }
+
+  saveTokens(data.accessToken, Number(data.accessExp));
+  return data;
+}

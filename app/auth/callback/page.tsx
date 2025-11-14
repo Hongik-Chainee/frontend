@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveTokens } from '@/services/auth/tokenStorage';
-import { fetchMe } from '@/services/auth/authApi';
+import { exchangeLoginCode, fetchMe } from '@/services/auth/authApi';
 
 // base64url → JSON
 function base64UrlToJson(b64url: string) {
@@ -19,6 +19,7 @@ function parseHash(hash: string) {
   const p = new URLSearchParams(h);
   const n = (k: string) => (p.get(k) ? Number(p.get(k)) : undefined);
   return {
+    loginCode: p.get('loginCode') ?? undefined,
     accessToken: p.get('accessToken') ?? undefined,
     accessExp: n('accessExp'),
     refreshExp: n('refreshExp'),
@@ -35,14 +36,24 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     (async () => {
       try {
-        const { accessToken, accessExp: expFromHash, nextStep } = parseHash(window.location.hash);
+        const { loginCode, accessToken: tokenFromHash, accessExp: expFromHash, nextStep: stepFromHash } = parseHash(window.location.hash);
+        let accessToken = tokenFromHash;
+        let accessExp = expFromHash;
+        let nextStep = stepFromHash;
+
+        if (!accessToken && loginCode) {
+          const exchanged = await exchangeLoginCode(loginCode);
+          accessToken = exchanged.accessToken;
+          accessExp = Number(exchanged.accessExp);
+          nextStep = nextStep ?? exchanged.nextStep;
+        }
+
         if (!accessToken) {
-          setMsg('토큰이 없어 로그인에 실패했습니다.');
+          setMsg('로그인 코드 교환에 실패했습니다.');
           return;
         }
 
         // exp가 없으면 JWT payload에서 exp 추출
-        let accessExp = expFromHash;
         if (!accessExp) {
           const parts = accessToken.split('.');
           if (parts.length < 2) {
