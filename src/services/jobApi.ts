@@ -1,4 +1,5 @@
 import type { JobListResponse, JobSort } from "@/models/job";
+import { getValidAccessToken } from "@/services/auth/authApi";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE!;
 
@@ -31,4 +32,51 @@ export async function fetchJobPosts(params: FetchJobParams = {}): Promise<JobLis
     throw new Error("INVALID_JOB_POSTS_RESPONSE");
   }
   return data;
+}
+
+export type CreateJobPostPayload = {
+  title: string;
+  description: string;
+  payment?: number;
+  requiredSkills?: string[];
+  duration?: string;
+  deadline?: string;
+};
+
+type CreateJobPostResponse = {
+  success: boolean;
+  messageCode?: string;
+  data?: {
+    postId?: string;
+  };
+};
+
+export async function createJobPost(
+  payload: CreateJobPostPayload
+): Promise<{ postId: string; messageCode?: string }> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("UNAUTHORIZED");
+
+  const res = await fetch(`${BASE}/api/job/posts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`JOB_POST_CREATE_FAILED ${res.status} ${text}`);
+  }
+
+  const data = (await res.json()) as CreateJobPostResponse;
+  const postId = data?.data?.postId;
+  if (!data?.success || !postId) {
+    throw new Error("INVALID_JOB_POST_RESPONSE");
+  }
+  return { postId, messageCode: data.messageCode };
 }
