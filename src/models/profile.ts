@@ -25,8 +25,16 @@ export interface JobPosting {
 }
 
 export interface Resume {
+  id: number;
+  title: string;
   name: string;
-  lastUpdate: string;
+  introduction?: string;
+  desiredPosition?: string;
+  skills: string[];
+  careerLevel?: string;
+  portfolioUrl?: string;
+  updatedAt?: string;
+  createdAt?: string;
 }
 
 export interface Introduction {

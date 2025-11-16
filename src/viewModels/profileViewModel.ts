@@ -121,8 +121,16 @@ function adaptJobPostings(raw: ProfileResponse): JobPosting[] {
 
 function adaptResumes(raw: ProfileResponse): Resume[] {
   return (raw.resumes ?? []).map((r: any) => ({
-    name: r?.name ?? r?.title ?? "Resume",
-    lastUpdate: r?.lastUpdate ?? r?.updatedAt ?? "",
+    id: Number(r?.id ?? 0),
+    title: r?.title ?? r?.name ?? "Resume",
+    name: r?.name ?? "",
+    introduction: r?.introduction ?? "",
+    desiredPosition: r?.desiredPosition ?? "",
+    skills: parseSkills(r?.skills),
+    careerLevel: r?.careerLevel ?? "",
+    portfolioUrl: r?.portfolioUrl ?? "",
+    updatedAt: r?.updatedAt ?? r?.lastUpdate ?? "",
+    createdAt: r?.createdAt ?? "",
   }));
 }
 
