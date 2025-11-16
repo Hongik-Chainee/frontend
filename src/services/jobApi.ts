@@ -104,6 +104,37 @@ export async function fetchJobPostDetail(postId: number | string): Promise<JobPo
   };
 }
 
+type ApplyResponse = {
+  success?: boolean;
+  messageCode?: string;
+};
+
+export async function applyToJobPost(postId: number | string, resumeId: number): Promise<void> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("UNAUTHORIZED");
+
+  const res = await fetch(`${BASE}/api/job/posts/${postId}/apply`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+    body: JSON.stringify({ resumeId }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`JOB_POST_APPLY_FAILED ${res.status} ${text}`);
+  }
+
+  const data = (await res.json().catch(() => ({}))) as ApplyResponse;
+  if (data && data.success === false) {
+    throw new Error(data.messageCode || "APPLICATION_FAILED");
+  }
+}
+
 export type CreateJobPostPayload = {
   title: string;
   description: string;

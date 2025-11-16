@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { useRouter } from 'next/navigation';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import type { JobPost } from '@/models/job';
-import { fetchJobPostDetail } from '@/services/jobApi';
+import type { Resume } from '@/models/profile';
+import { fetchJobPostDetail, applyToJobPost } from '@/services/jobApi';
+import { fetchMyResumes } from '@/services/resumeApi';
 
 type Props = {
   postId: string;
@@ -15,6 +17,14 @@ export function JobDetailView({ postId }: Props) {
   const [post, setPost] = useState<JobPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [resumesLoading, setResumesLoading] = useState(false);
+  const [resumesError, setResumesError] = useState<string | null>(null);
+  const [selectedResumeId, setSelectedResumeId] = useState<number | null>(null);
+  const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [applySuccess, setApplySuccess] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -33,6 +43,56 @@ export function JobDetailView({ postId }: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadResumes = useCallback(async () => {
+    setResumesLoading(true);
+    setResumesError(null);
+    try {
+      const list = await fetchMyResumes();
+      setResumes(list);
+      setSelectedResumeId((prev) => {
+        if (prev) return prev;
+        return list.length > 0 ? list[0].id : null;
+      });
+    } catch (err: any) {
+      setResumesError(err?.message ?? '이력서를 불러오지 못했습니다.');
+    } finally {
+      setResumesLoading(false);
+    }
+  }, []);
+
+  const openApplyModal = () => {
+    setApplyModalOpen(true);
+    setApplyError(null);
+    setApplySuccess(false);
+    if (!resumes.length) {
+      loadResumes();
+    }
+  };
+
+  const closeApplyModal = () => {
+    setApplyModalOpen(false);
+    setApplyError(null);
+    setApplying(false);
+  };
+
+  const submitApplication = async () => {
+    if (!post) return;
+    if (!selectedResumeId) {
+      setApplyError('이력서를 선택해 주세요.');
+      return;
+    }
+    setApplying(true);
+    setApplyError(null);
+    try {
+      await applyToJobPost(post.id, selectedResumeId);
+      setApplySuccess(true);
+    } catch (err: any) {
+      setApplyError(err?.message ?? '지원에 실패했습니다.');
+    } finally {
+      setApplying(false);
+    }
+  };
 
   const paymentLabel = useMemo(() => {
     if (!post?.payment) return '협의 후 결정';
@@ -111,7 +171,10 @@ export function JobDetailView({ postId }: Props) {
               <button className="rounded-full bg-white/10 px-6 py-3 text-sm font-medium hover:bg-white/20">
                 Contact
               </button>
-              <button className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white hover:opacity-90">
+              <button
+                className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white hover:opacity-90"
+                onClick={openApplyModal}
+              >
                 Apply
               </button>
             </section>
@@ -127,6 +190,25 @@ export function JobDetailView({ postId }: Props) {
           </article>
         ) : null}
       </div>
+      {applyModalOpen && post && (
+        <ResumeApplyModal
+          resumes={resumes}
+          loading={resumesLoading}
+          error={resumesError}
+          selectedId={selectedResumeId}
+          onSelect={setSelectedResumeId}
+          onClose={closeApplyModal}
+          onSubmit={submitApplication}
+          submitting={applying}
+          submitError={applyError}
+          success={applySuccess}
+          onRefresh={loadResumes}
+          onNewResume={() => {
+            closeApplyModal();
+            router.push('/profile');
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -255,6 +337,121 @@ function DetailSkeleton() {
       </div>
       <div className="mt-10 h-32 rounded-2xl bg-white/5" />
       <div className="mt-10 h-24 rounded-2xl bg-white/5" />
+    </div>
+  );
+}
+
+function ResumeApplyModal({
+  resumes,
+  loading,
+  error,
+  selectedId,
+  onSelect,
+  onClose,
+  onSubmit,
+  submitting,
+  submitError,
+  success,
+  onRefresh,
+  onNewResume,
+}: {
+  resumes: Resume[];
+  loading: boolean;
+  error: string | null;
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  submitting: boolean;
+  submitError: string | null;
+  success: boolean;
+  onRefresh: () => void;
+  onNewResume: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-10">
+      <div className="w-full max-w-xl rounded-3xl bg-[#16192a] p-6 text-white shadow-2xl">
+        <div className="flex items-center justify-between">
+          <p className="text-lg font-semibold">지원할 이력서 선택</p>
+          <button onClick={onClose} className="text-white/70 hover:text-white" aria-label="Close apply modal">
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3 max-h-[360px] overflow-y-auto pr-1">
+          {loading && (
+            <div className="rounded-2xl bg-white/5 p-4 text-center text-sm text-white/70">이력서를 불러오는 중…</div>
+          )}
+          {error && (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+              {error}
+              <button
+                type="button"
+                onClick={onRefresh}
+                className="mt-3 rounded-full bg-red-500/70 px-3 py-1 text-xs font-semibold"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!loading && !error && resumes.length === 0 && (
+            <div className="rounded-2xl bg-white/5 p-4 text-sm text-white/70">
+              등록된 이력서가 없습니다. 아래 버튼을 눌러 새로 작성할 수 있습니다.
+            </div>
+          )}
+
+          {resumes.map((resume) => (
+            <button
+              key={resume.id}
+              type="button"
+              onClick={() => onSelect(resume.id)}
+              className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                selectedId === resume.id ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/5'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold">{resume.title}</p>
+                  <p className="text-xs text-white/60">
+                    업데이트: {resume.updatedAt ? new Date(resume.updatedAt).toLocaleDateString() : '알 수 없음'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-primary/30 px-3 py-1 text-xs font-semibold text-primary">OPEN</span>
+              </div>
+              {resume.skills?.length ? (
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-white/70">
+                  {resume.skills.slice(0, 4).map((skill, idx) => (
+                    <span key={idx} className="rounded-full bg-white/10 px-2 py-1">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={onNewResume}
+          className="mt-4 w-full rounded-2xl border border-dashed border-white/20 px-4 py-3 text-sm text-white/70 hover:bg-white/5"
+        >
+          + 새 이력서 등록하기
+        </button>
+
+        {submitError && <p className="mt-3 text-sm text-red-300">{submitError}</p>}
+        {success && <p className="mt-3 text-sm text-emerald-300">지원이 완료되었습니다.</p>}
+
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={submitting || !selectedId}
+          className="mt-4 w-full rounded-full bg-emerald-400 px-6 py-3 text-center text-base font-semibold text-black disabled:opacity-60"
+        >
+          {submitting ? 'Submitting…' : success ? 'Applied' : 'Apply'}
+        </button>
+      </div>
     </div>
   );
 }
