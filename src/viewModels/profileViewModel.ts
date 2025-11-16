@@ -111,6 +111,7 @@ function adaptJobPostings(raw: ProfileResponse): JobPosting[] {
       job?.applicantCount != null ? `${job.applicantCount} applications` : null,
     ].filter(Boolean);
     return {
+      id: job?.id,
       name: job?.title ?? "Untitled job",
       status,
       details: detailParts.join(" | "),

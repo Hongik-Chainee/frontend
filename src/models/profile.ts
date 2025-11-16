@@ -18,6 +18,7 @@ export interface Project {
 }
 
 export interface JobPosting {
+  id?: number;
   name: string;
   status: 'OPEN' | 'Closed';
   details: string;

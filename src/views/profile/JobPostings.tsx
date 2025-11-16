@@ -24,7 +24,7 @@ export function JobPostings({ jobPostings }: JobPostingsProps) {
         <>
           <div className="space-y-4">
             {jobPostings.map((job, index) => (
-              <div key={index} className="bg-[#222] rounded-lg p-4 flex justify-between items-center">
+              <div key={job.id ?? index} className="bg-[#222] rounded-lg p-4 flex justify-between items-center">
                 <div>
                   <div className="flex items-center">
                     <h3 className="font-bold mr-2">{job.name}</h3>
@@ -32,7 +32,16 @@ export function JobPostings({ jobPostings }: JobPostingsProps) {
                   </div>
                   <p className="text-gray-400 text-sm mt-1">{job.details}</p>
                 </div>
-                <button className="bg-purple-600 px-4 py-2 rounded-lg hover:bg-purple-700">View details</button>
+                {job.id ? (
+                  <Link
+                    href={`/profile/job-post/${job.id}/applicants`}
+                    className="bg-purple-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700"
+                  >
+                    View details
+                  </Link>
+                ) : (
+                  <span className="text-xs text-gray-400">No details</span>
+                )}
               </div>
             ))}
           </div>
