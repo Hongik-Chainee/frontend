@@ -36,10 +36,17 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     (async () => {
       try {
-        const { loginCode, accessToken: tokenFromHash, accessExp: expFromHash, nextStep: stepFromHash } = parseHash(window.location.hash);
+        const {
+          loginCode,
+          accessToken: tokenFromHash,
+          accessExp: expFromHash,
+          nextStep: stepFromHash,
+          registered,
+        } = parseHash(window.location.hash);
         let accessToken = tokenFromHash;
         let accessExp = expFromHash;
         let nextStep = stepFromHash;
+        const isExistingUser = registered;
 
         if (!accessToken && loginCode) {
           const exchanged = await exchangeLoginCode(loginCode);
@@ -76,6 +83,22 @@ export default function AuthCallbackPage() {
 
         // 3) 라우팅: nextStep이 우선
         setMsg('인증 완료. 이동합니다…');
+
+        if (isExistingUser) {
+          router.replace('/');
+          return;
+        }
+
+        // 기존 온보딩 강제 이동 로직 유지용
+        // if (nextStep === 'KYC') {
+        //   router.replace('/onboarding/personal');
+        //   return;
+        // }
+        // if (nextStep === 'DID') {
+        //   router.replace('/onboarding/did');
+        //   return;
+        // }
+
         if (nextStep === 'KYC') {
           router.replace('/onboarding/personal');
           return;
@@ -88,7 +111,7 @@ export default function AuthCallbackPage() {
         // 4) nextStep이 없거나 알 수 없을 때 서버 상태로 보정
         const me = await fetchMe(); // { kyc, did } | null
         if (!me) {
-          router.replace('/dashboard'); // 보수적 기본
+          router.replace('/'); // 보수적 기본
           return;
         }
         if (!me.kyc) {
@@ -96,7 +119,7 @@ export default function AuthCallbackPage() {
         } else if (!me.did) {
           router.replace('/onboarding/did');
         } else {
-          router.replace('/dashboard');
+          router.replace('/');
         }
       } catch (e) {
         console.error('[auth/callback] error:', e);
