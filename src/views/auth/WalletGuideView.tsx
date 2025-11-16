@@ -1,9 +1,83 @@
 'use client';
 
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { CustomConnectButton } from '@/components/auth/CustomConnectButton';
+import {
+  DID_CHALLENGE_PHASE_MESSAGES,
+  DidChallengePhase,
+  executeDidChallengeFlow,
+} from '@/services/did/didChallengeFlow';
 
 export function WalletGuideView() {
+  const { connected, publicKey, signMessage } = useWallet();
+  const [flowPhase, setFlowPhase] = useState<DidChallengePhase>('idle');
+  const [flowMessage, setFlowMessage] = useState('');
+  const [flowError, setFlowError] = useState<string | null>(null);
+  const [lastNonce, setLastNonce] = useState<string | null>(null);
+  const flowRunningRef = useRef(false);
+
+  const challengeDomain = useMemo(
+    () =>
+      process.env.NEXT_PUBLIC_CHAIN_DOMAIN ||
+      (typeof window !== 'undefined' ? window.location.host : 'localhost'),
+    []
+  );
+
+  const shortAddress = useMemo(() => {
+    const addr = publicKey?.toBase58() ?? '';
+    return addr ? `${addr.slice(0, 4)}...${addr.slice(-4)}` : '';
+  }, [publicKey]);
+
+  const runDidFlow = useCallback(async () => {
+    if (!publicKey || !signMessage) return;
+    const holder = publicKey.toBase58();
+
+    flowRunningRef.current = true;
+    setFlowError(null);
+    setLastNonce(null);
+
+    try {
+      await executeDidChallengeFlow({
+        holder,
+        domain: challengeDomain,
+        signMessage: (message) => signMessage(message),
+        onPhaseChange: (phase, details) => {
+          setFlowPhase(phase);
+          setFlowMessage(details?.message || '');
+          setFlowError(phase === 'error' ? details?.message || null : null);
+          setLastNonce(details?.nonce ?? null);
+        },
+      });
+    } catch (error: any) {
+      console.error(error);
+      setFlowPhase('error');
+      setFlowError(error?.message ?? 'UNKNOWN_CHAIN_ERROR');
+    } finally {
+      flowRunningRef.current = false;
+    }
+  }, [challengeDomain, publicKey, signMessage]);
+
+  useEffect(() => {
+    if (!connected || !publicKey) {
+      flowRunningRef.current = false;
+      setFlowPhase('idle');
+      setFlowMessage('');
+      setFlowError(null);
+      return;
+    }
+
+    if (!signMessage) {
+      setFlowPhase('error');
+      setFlowError('선택한 지갑은 메시지 서명을 지원하지 않습니다.');
+      return;
+    }
+
+    if (flowRunningRef.current) return;
+    runDidFlow();
+  }, [connected, publicKey, runDidFlow, signMessage]);
+
   return (
     <div className="min-h-screen bg-secondary text-white">
       <div className="mx-auto max-w-6xl px-6 py-14 lg:flex lg:gap-10">
@@ -69,18 +143,58 @@ export function WalletGuideView() {
                 <div className="flex items-center justify-between rounded-xl bg-background/60 p-3 ring-1 ring-white/10">
                   <div>
                     <p className="text-sm font-semibold">1. 지갑 연결</p>
-                    <p className="text-xs text-white/70">사이트와 지갑을 연결합니다</p>
+                    <p className="text-xs text-white/70">
+                      {connected ? '지갑이 성공적으로 연결되었습니다.' : '사이트와 지갑을 연결합니다.'}
+                    </p>
                   </div>
-                  <CustomConnectButton />
+                  <div className="flex flex-col items-end gap-1">
+                    <CustomConnectButton />
+                    <span
+                      className={`text-xs ${connected ? 'text-emerald-300' : 'text-white/60'}`}
+                    >
+                      {connected ? shortAddress : '연결 대기'}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between rounded-xl bg-background/40 p-3 ring-1 ring-white/10">
                   <div>
                     <p className="text-sm font-semibold">2. 트랜잭션 서명</p>
-                    <p className="text-xs text-white/70">거래 내용을 확인하고 서명합니다</p>
+                    <p className="text-xs text-white/70">
+                      {flowMessage || 'Challenge를 발급받고 VC/VP에 서명합니다.'}
+                    </p>
                   </div>
-                  <span className="text-xs text-white/60">대기 중…</span>
+                  <span
+                    className={`text-xs ${
+                      flowPhase === 'success'
+                        ? 'text-emerald-300'
+                        : flowPhase === 'error'
+                        ? 'text-rose-300'
+                        : 'text-white/60'
+                    }`}
+                  >
+                    {flowPhase === 'error' && flowError
+                      ? flowError
+                      : DID_CHALLENGE_PHASE_MESSAGES[flowPhase]}
+                  </span>
                 </div>
+
+                {flowPhase !== 'idle' && (
+                  <div className="rounded-xl bg-background/30 p-3 text-xs text-white/80 ring-1 ring-white/10">
+                    <p className="font-semibold text-white">진행 상태</p>
+                    <p className="mt-1">
+                      {flowPhase === 'error' && flowError
+                        ? flowError
+                        : flowMessage || DID_CHALLENGE_PHASE_MESSAGES[flowPhase]}
+                    </p>
+                    {lastNonce && (
+                      <p className="mt-1 text-white/60">Nonce: {lastNonce}</p>
+                    )}
+                    {flowPhase === 'success' && (
+                      <p className="mt-1 text-emerald-300">체인 검증이 완료되었습니다.</p>
+                    )}
+                  </div>
+                )}
               </div>
             </StepCard>
 

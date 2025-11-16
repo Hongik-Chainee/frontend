@@ -3,6 +3,10 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DidStartViewModel } from '@/viewModels/didStartViewModel';
+import {
+  DID_CHALLENGE_PHASE_MESSAGES,
+  DidChallengePhase,
+} from '@/services/did/didChallengeFlow';
 
 const LINKS = {
   phantomChrome: 'https://chromewebstore.google.com/detail/phantom/bfnaelmomeimhlpmgjnjophhpkkoljpa',
@@ -15,30 +19,59 @@ export function DidStartView() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [flowPhase, setFlowPhase] = useState<DidChallengePhase>('idle');
+  const [flowMessage, setFlowMessage] = useState('');
+  const [flowError, setFlowError] = useState<string | null>(null);
+  const [lastNonce, setLastNonce] = useState<string | null>(null);
 
   const section = 'rounded-2xl bg-secondary-dark/90 shadow-2xl p-5 md:p-6';
   const step = 'rounded-xl border border-white/10 bg-white/5 p-4';
   const btn = 'rounded-lg bg-primary px-4 py-3 font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition';
   const pill = 'inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-white/10';
+  const flowStatusText =
+    flowPhase === 'error' && flowError
+      ? flowError
+      : flowMessage || DID_CHALLENGE_PHASE_MESSAGES[flowPhase];
 
   // 1) 지갑 연결 + nonce 서명 검증 (이동 X)
   const connect = async () => {
-    setMsg(null); setBusy(true);
-    const r = await vm.connectAndVerify();
+    setMsg(null);
+    setFlowError(null);
+    setLastNonce(null);
+    setFlowMessage('');
+    setFlowPhase('idle');
+    setBusy(true);
+
+    const r = await vm.connectAndVerify((phase, details) => {
+      setFlowPhase(phase);
+      setFlowMessage(details?.message || '');
+      setLastNonce(details?.nonce ?? null);
+      setFlowError(phase === 'error' ? details?.message || null : null);
+    });
+
     setBusy(false);
     if (r.ok) {
-      setMsg('지갑 인증이 완료되었습니다.');
-    } else {
-      if (r.error === 'PHANTOM_NOT_FOUND') {
-        setMsg('Phantom 지갑을 설치/활성화 해주세요.');
-      } else if (r.error === 'NONCE_FAIL') {
-        setMsg('서버에서 nonce 발급에 실패했습니다.');
-      } else if (r.error === 'VERIFY_FAIL' || r.error === 'SIGNATURE_INVALID') {
-        setMsg('서명 검증에 실패했습니다. 다시 시도해주세요.');
-      } else {
-        setMsg('지갑 연결 중 오류가 발생했습니다.');
-      }
+      setMsg('지갑 인증 및 DID 검증이 완료되었습니다.');
+      return;
     }
+
+    switch (r.error) {
+      case 'PHANTOM_NOT_FOUND':
+        setMsg('Phantom 지갑을 설치/활성화 해주세요.');
+        break;
+      case 'WALLET_NO_ADDRESS':
+        setMsg('지갑 주소를 확인할 수 없습니다.');
+        break;
+      case 'SIGN_MESSAGE_NOT_SUPPORTED':
+        setMsg('선택한 지갑은 메시지 서명을 지원하지 않습니다.');
+        break;
+      default:
+        setMsg(r.error || '지갑 연결 중 오류가 발생했습니다.');
+        break;
+    }
+
+    setFlowPhase('error');
+    setFlowError(r.error || '지갑 연결 실패');
   };
 
   // 2) 온체인 DID 발급 → 3) 백엔드 마킹 → 4) 완료 페이지 이동
@@ -51,7 +84,13 @@ export function DidStartView() {
       return;
     }
 
-    const m = await vm.markDidVerified(); // { verified: true }
+    if (!r.did) {
+      setBusy(false);
+      setMsg('발급 결과에서 DID 정보를 확인할 수 없습니다.');
+      return;
+    }
+
+    const m = await vm.markDidVerified(r.did); // { verified: true }
     setBusy(false);
 
     if (!m.ok) {
@@ -133,7 +172,22 @@ export function DidStartView() {
 
               <div className={`${step} opacity-90`}>
                 <p className="font-medium">2. 서명으로 본인확인</p>
-                <p className="text-sm text-white/60">서버가 제공한 nonce에 서명하면 DID가 등록됩니다.</p>
+                <p
+                  className={`text-sm ${
+                    flowPhase === 'success'
+                      ? 'text-emerald-300'
+                      : flowPhase === 'error'
+                      ? 'text-rose-300'
+                      : 'text-white/60'
+                  }`}
+                >
+                  {flowStatusText}
+                </p>
+                {lastNonce && (
+                  <p className="mt-2 font-mono text-xs text-white/40 break-all">
+                    Nonce: {lastNonce}
+                  </p>
+                )}
               </div>
             </div>
 

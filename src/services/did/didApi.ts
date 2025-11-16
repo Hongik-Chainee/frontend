@@ -43,10 +43,21 @@ export async function didVerify(did: string, addressBase58: string, signatureBas
   return data as { success: true; accessToken: string; accessExp: number; refreshExp: number };
 }
 
-// 최종 마킹: didVerified = true (idempotent)
-export async function didMarkVerified(verified: boolean) {
+type DidMarkResponse = {
+  success: boolean;
+  didVerified: boolean;
+  did?: string;
+  didVerifiedAt?: string;
+};
+
+// 최종 마킹: didVerified 상태 업데이트
+export async function didMarkVerified(verified: boolean, did?: string) {
   const token = await getValidAccessToken();
   if (!token) throw new Error("NO_TOKEN");
+
+  if (verified && !did) {
+    throw new Error("DID_REQUIRED");
+  }
 
   const r = await fetch(`${BASE}/api/did/verify`, {
     method: "POST",
@@ -55,7 +66,9 @@ export async function didMarkVerified(verified: boolean) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ verified }),
+    body: JSON.stringify(
+      verified ? { verified: true, did } : { verified: false }
+    ),
   });
 
   const data = await r.json().catch(() => ({}));
@@ -65,5 +78,5 @@ export async function didMarkVerified(verified: boolean) {
     saveTokens(data.accessToken, Number(data.accessExp));
   }
 
-  return data as { success: true };
+  return data as DidMarkResponse;
 }
