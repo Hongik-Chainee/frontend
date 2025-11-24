@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import FeatureSection from '@/components/landing/FeatureSection';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -45,15 +46,15 @@ export default function Home() {
               priority
             />
 
-              <Link href="/auth/walletguide">
-                <motion.button
-                  className="bg-web3-mint hover:bg-web3-mintDark text-black font-bold py-3 px-8 rounded-lg text-lg shadow-lg transition-all"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Wallet guide test
-                </motion.button>
-              </Link>
+            <Link href="/auth/walletguide">
+              <motion.button
+                className="bg-web3-mint hover:bg-web3-mintDark text-black font-bold py-3 px-8 rounded-lg text-lg shadow-lg transition-all"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Wallet guide test
+              </motion.button>
+            </Link>
           </div>
         </div>
       </section>
@@ -78,6 +79,9 @@ export default function Home() {
           </div>
         </motion.div>
       </main>
+
+      {/* 기능 소개 섹션 */}
+      <FeatureSection />
     </div>
   );
 }

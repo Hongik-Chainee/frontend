@@ -1,14 +1,16 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
 import { useNotificationPanel } from '@/providers/NotificationPanelProvider';
 import type { NotificationItem } from '@/models/notification';
 import { fetchNotifications } from '@/services/notificationsApi';
 
 export default function NotificationPanel() {
   const { isOpen, close } = useNotificationPanel();
+  const router = useRouter();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -45,6 +47,120 @@ export default function NotificationPanel() {
       loadPage(0, 'replace');
     }
   }, [isOpen, loadPage]);
+
+  // 알림 타입에 따라 동적으로 링크 생성
+  const generateNotificationLink = useCallback((item: NotificationItem): string | null => {
+    // 디버깅: 모든 알림 정보 출력
+    console.log('=== Notification Debug ===');
+    console.log('Type:', item.type);
+    console.log('Title:', item.title);
+    console.log('Message:', item.message);
+    console.log('LinkUrl:', item.linkUrl);
+    console.log('========================');
+
+    // 서버에서 linkUrl이 있으면 우선 사용
+    if (item.linkUrl) {
+      console.log('[generateNotificationLink] Using server linkUrl:', item.linkUrl);
+      return item.linkUrl;
+    }
+
+    // 알림 타입별 링크 생성
+    switch (item.type) {
+      case 'JOB_APPLICATION_RECEIVED':
+        // 구인 공고 지원 알림 -> 지원자 목록 페이지
+        // message에서 jobId 추출 시도 (예: "공고 #123에 지원이 접수되었습니다")
+        const jobIdMatch = item.message.match(/#(\d+)/);
+        if (jobIdMatch) {
+          return `/projects/${jobIdMatch[1]}/applicants`;
+        }
+        return '/projects';
+
+      case 'JOB_STATUS_UPDATED':
+        // 지원 상태 업데이트 알림 -> 해당 공고 페이지
+        const statusJobMatch = item.message.match(/#(\d+)/);
+        if (statusJobMatch) {
+          return `/projects/${statusJobMatch[1]}`;
+        }
+        return '/projects';
+
+      case 'CONTRACT_REQUEST':
+      case 'CONTRACT_SIGNATURE_REQUEST':  // ✅ 서버가 사용하는 실제 타입
+        // 계약 요청 알림 → 계약서 페이지 (구직자 역할)
+        console.log('[NotificationPanel] CONTRACT_REQUEST/SIGNATURE_REQUEST message:', item.message);
+        try {
+          // 메시지가 JSON 형식인지 확인 (프론트에서 보낸 경우)
+          const data = JSON.parse(item.message);
+          console.log('[NotificationPanel] Parsed contract data:', data);
+          if (data.type === 'CONTRACT_REQUEST' && data.postId) {
+            const params = new URLSearchParams({
+              postId: data.postId,
+              role: 'applicant',
+            });
+            if (data.contract) params.set('contract', data.contract);
+            if (data.escrow) params.set('escrow', data.escrow);
+            params.set('applicantSigned', 'false');
+            const link = `/contracts/review?${params.toString()}`;
+            console.log('[NotificationPanel] Generated link:', link);
+            return link;
+          }
+        } catch (e) {
+          // JSON 파싱 실패 시 기존 로직으로 폴백
+          console.log('[NotificationPanel] JSON parse failed, using fallback:', e);
+        }
+
+        // 폴백: message에서 공고 제목 추출
+        // 예: "'junior solidity engineer' 공고에 대한 계약서 전자 서명을 진행해 주세요."
+        console.log('[NotificationPanel] Extracting job title from message...');
+
+        // 임시 해결책: 알림 데이터에 다른 필드가 있는지 확인
+        // actorId나 다른 필드에 정보가 있을 수 있음
+        console.log('[NotificationPanel] Full notification item:', item);
+
+        // 메시지에서 공고 번호나 ID 추출 시도
+        const idMatch = item.message.match(/#(\d+)/);
+        if (idMatch) {
+          const fallbackLink = `/contracts/review?postId=${idMatch[1]}&role=applicant`;
+          console.log('[NotificationPanel] Fallback link with ID:', fallbackLink);
+          return fallbackLink;
+        }
+
+        // ID가 없으면 일단 기본 페이지로
+        console.warn('[NotificationPanel] Cannot extract postId from message, returning null');
+        return null;
+
+      case 'PROJECT_INVITE':
+        // 프로젝트 초대 알림 -> 프로젝트 상세 페이지
+        const projectMatch = item.message.match(/#(\d+)/);
+        if (projectMatch) {
+          return `/projects/${projectMatch[1]}`;
+        }
+        return '/projects';
+
+      case 'SYSTEM':
+        // 시스템 알림 -> 링크 없음
+        return null;
+
+      default:
+        // 기본값: 알림 타입에 따라 추측
+        if (item.message.includes('계약')) {
+          return '/contracts/review';
+        }
+        if (item.message.includes('프로젝트') || item.message.includes('공고')) {
+          return '/projects';
+        }
+        return null;
+    }
+  }, []);
+
+  const handleNavigate = useCallback(
+    (item: NotificationItem) => {
+      const link = generateNotificationLink(item);
+      if (!link) return;
+      close();
+      router.push(link);
+    },
+    [router, close, generateNotificationLink]
+  );
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
@@ -108,7 +224,7 @@ export default function NotificationPanel() {
                             <ul className="space-y-2">
                               {items.map((item) => (
                                 <li key={item.id}>
-                                  <NotificationCard item={item} />
+                                  <NotificationCard item={item} onNavigate={handleNavigate} />
                                 </li>
                               ))}
                             </ul>
@@ -136,9 +252,37 @@ export default function NotificationPanel() {
   );
 }
 
-function NotificationCard({ item }: { item: NotificationItem }) {
+function NotificationCard({
+  item,
+  onNavigate,
+}: {
+  item: NotificationItem;
+  onNavigate?: (item: NotificationItem) => void;
+}) {
+  const clickable = Boolean(onNavigate);
+
+  const handleClick = () => {
+    if (!clickable) return;
+    onNavigate?.(item);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!clickable) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onNavigate?.(item);
+    }
+  };
+
   return (
-    <div className="rounded-2xl bg-white/10 px-3 py-3 text-white/80 ring-1 ring-white/5">
+    <div
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      className={`w-full rounded-2xl bg-white/10 px-3 py-3 text-white/80 ring-1 ring-white/5 ${clickable ? 'cursor-pointer transition hover:ring-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70' : ''
+        }`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-white">{item.title}</p>

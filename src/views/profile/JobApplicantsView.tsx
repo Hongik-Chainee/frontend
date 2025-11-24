@@ -90,7 +90,15 @@ export function JobApplicantsView({ postId }: Props) {
                 </div>
               ) : (
                 applicants.map((applicant) => (
-                  <ApplicantCard key={applicant.applicationId} applicant={applicant} />
+                  <ApplicantCard
+                    key={applicant.applicationId}
+                    applicant={applicant}
+                    onContract={(applicationId) =>
+                      router.push(
+                        `/contracts/progress?postId=${postId}&role=employer&applicationId=${applicationId}`
+                      )
+                    }
+                  />
                 ))
               )}
             </div>
@@ -111,7 +119,13 @@ function Stat({ label, value, subtle }: { label: string; value: string; subtle?:
   );
 }
 
-function ApplicantCard({ applicant }: { applicant: Applicant }) {
+function ApplicantCard({
+  applicant,
+  onContract,
+}: {
+  applicant: Applicant;
+  onContract: (applicationId: number) => void;
+}) {
   const appliedDate = applicant.appliedAt
     ? new Date(applicant.appliedAt).toLocaleDateString()
     : '지원일 미상';
@@ -140,7 +154,10 @@ function ApplicantCard({ applicant }: { applicant: Applicant }) {
           <button className="rounded-full bg-primary/20 px-4 py-2 text-sm text-primary hover:bg-primary/30">
             Message
           </button>
-          <button className="rounded-full bg-emerald-500/20 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-500/30">
+          <button
+            onClick={() => onContract(applicant.applicationId)}
+            className="rounded-full bg-emerald-500/20 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-500/30"
+          >
             Contract
           </button>
         </div>

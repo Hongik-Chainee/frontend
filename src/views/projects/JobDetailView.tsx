@@ -207,6 +207,11 @@ export function JobDetailView({ postId }: Props) {
             closeApplyModal();
             router.push('/profile');
           }}
+          postId={post.id}
+          onGoToContract={() => {
+            closeApplyModal();
+            router.push(`/contracts/progress?postId=${post.id}&role=applicant`);
+          }}
         />
       )}
     </div>
@@ -354,6 +359,8 @@ function ResumeApplyModal({
   success,
   onRefresh,
   onNewResume,
+  postId,
+  onGoToContract,
 }: {
   resumes: Resume[];
   loading: boolean;
@@ -367,6 +374,8 @@ function ResumeApplyModal({
   success: boolean;
   onRefresh: () => void;
   onNewResume: () => void;
+  postId?: number;
+  onGoToContract?: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-10">
@@ -441,7 +450,20 @@ function ResumeApplyModal({
         </button>
 
         {submitError && <p className="mt-3 text-sm text-red-300">{submitError}</p>}
-        {success && <p className="mt-3 text-sm text-emerald-300">지원이 완료되었습니다.</p>}
+        {success && (
+          <div className="mt-3 space-y-3 text-sm text-emerald-300">
+            <p>지원이 완료되었습니다.</p>
+            {postId && onGoToContract && (
+              <button
+                type="button"
+                onClick={onGoToContract}
+                className="w-full rounded-full border border-emerald-300/40 bg-emerald-500/10 px-4 py-2 text-emerald-200 hover:bg-emerald-500/20"
+              >
+                계약 진행 단계로 이동
+              </button>
+            )}
+          </div>
+        )}
 
         <button
           type="button"

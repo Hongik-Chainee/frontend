@@ -84,10 +84,10 @@ export default function AuthCallbackPage() {
         // 3) 라우팅: nextStep이 우선
         setMsg('인증 완료. 이동합니다…');
 
-        if (isExistingUser) {
-          router.replace('/');
-          return;
-        }
+        // if (isExistingUser) {
+        //   router.replace('/');
+        //   return;
+        // }
 
         // 기존 온보딩 강제 이동 로직 유지용
         // if (nextStep === 'KYC') {
